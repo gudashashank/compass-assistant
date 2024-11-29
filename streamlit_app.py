@@ -355,7 +355,7 @@ def get_top_recommendations() -> str:
 
         client = OpenAI(api_key=st.secrets["open-key"])
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o-mini",
             messages=[
                 {
                     "role": "system",
