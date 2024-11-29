@@ -539,6 +539,13 @@ def show_preferences_form(existing_preferences=None):
             
             save_user_preferences(st.session_state.current_user, preferences)
             st.success("✅ Preferences saved successfully!")
+            
+            # Immediately hide preferences form and trigger chat interface
+            st.session_state.show_preferences = False
+            
+            # Use rerun to refresh the page and show chat interface
+            st.rerun()
+            
             return True
     return False
 
