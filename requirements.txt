@@ -1,2 +1,7 @@
 streamlit
 pandas
+chromadb
+openai
+python-docx
+requests
+pysqlite3-binary
