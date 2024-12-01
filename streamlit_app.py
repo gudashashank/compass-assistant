@@ -6,6 +6,7 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 import pandas as pd
 import docx
+from docx import Document
 from typing import Dict, List, Optional
 import chromadb
 from chromadb.utils import embedding_functions
@@ -14,6 +15,7 @@ import requests
 import logging
 import json
 from datetime import datetime
+from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +36,50 @@ LOCATION_TO_CITY = {
     "Southwest": "Houston",
     "West Coast": "Los Angeles"
 }
+
+# New global variables for enhanced features
+ALLOWED_TOPICS = [
+    "university", "college", "study", "education", "program", "course", "major",
+    "weather", "climate", "temperature",
+    "scholarship", "financial aid", "funding", "loan",
+    "job", "career", "employment", "industry", "economy", "market",
+    "visa", "application", "admission", "requirements",
+    "living", "accommodation", "housing", "expenses"
+]
+
+APPLICATION_CHECKLIST = """
+# University Application Checklist
+
+## Essential Documents
+- [ ] Statement of Purpose (SOP)
+- [ ] Letters of Recommendation (LOR)
+- [ ] Official Transcripts
+- [ ] Standardized Test Scores (GRE/GMAT if required)
+- [ ] English Proficiency Test (TOEFL/IELTS)
+- [ ] Resume/CV
+- [ ] Financial Documents
+
+## Additional Requirements
+- [ ] Portfolio (if applicable)
+- [ ] Writing Samples (if required)
+- [ ] Research Proposal (for research programs)
+- [ ] Letter of Intent
+
+## Administrative Tasks
+- [ ] Application Form Completion
+- [ ] Application Fee Payment
+- [ ] Passport Copy
+- [ ] Photograph according to specifications
+- [ ] Verification of Document Copies
+
+## Post-Admission Steps
+- [ ] Accept Admission Offer
+- [ ] Pay Deposit
+- [ ] Apply for Visa
+- [ ] Book Accommodation
+- [ ] Purchase Health Insurance
+- [ ] Plan Travel
+"""
 
 # User data file path
 USER_DATA_FILE = "user_data.json"
@@ -65,7 +111,6 @@ CHATBOT_TIPS = """
    - "How's the job market for data science in the Northeast?"
    - "Compare the weather between Boston and Miami"
 """
-
 def load_user_data() -> dict:
     """Load user data from JSON file."""
     if os.path.exists(USER_DATA_FILE):
@@ -94,6 +139,7 @@ def authenticate_user(username: str) -> bool:
             "preferences": None,
             "chat_history": [],
             "last_recommendations": None,
+            "applications": {},  # Added for tracking applications
             "created_at": datetime.now().isoformat()
         }
         save_user_data(users)
@@ -128,6 +174,58 @@ def save_last_recommendations(username: str, recommendations: str):
         save_user_data(users)
         st.session_state.user_data = users[username]
 
+def update_application_tracker(username: str, university: str, status: str) -> None:
+    """Update the user's university application tracking."""
+    try:
+        # Load current user data
+        users = load_user_data()
+        
+        # Ensure the username exists
+        if username not in users:
+            users[username] = {
+                "preferences": None,
+                "chat_history": [],
+                "last_recommendations": None,
+                "applications": {},
+                "created_at": datetime.now().isoformat()
+            }
+        
+        # Ensure applications dict exists
+        if "applications" not in users[username]:
+            users[username]["applications"] = {}
+        
+        # Update the application
+        users[username]["applications"][university] = {
+            "status": status,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # Save to file
+        save_user_data(users)
+        
+        # Update session state
+        st.session_state.user_data = users[username]
+        
+        # Log successful update
+        logger.info(f"Updated application for {username}: {university} - {status}")
+        
+    except Exception as e:
+        logger.error(f"Error updating application tracker: {str(e)}")
+        raise e
+
+def get_application_status(username: str) -> dict:
+    """Get the user's university application status."""
+    # First check session state for most up-to-date data
+    if hasattr(st.session_state, 'user_data'):
+        return st.session_state.user_data.get("applications", {})
+    
+    # Fallback to file storage
+    users = load_user_data()
+    if username in users:
+        return users[username].get("applications", {})
+    return {}
+
+
 def load_word_document(file_path: str) -> str:
     """Load content from a Word document."""
     try:
@@ -136,6 +234,96 @@ def load_word_document(file_path: str) -> str:
     except Exception as e:
         st.error(f"Error loading Word document: {str(e)}")
         return ""
+
+def is_relevant_query(query: str) -> bool:
+    """Check if the query is relevant to the system's purpose."""
+    query_words = set(query.lower().split())
+    return any(topic in query.lower() for topic in ALLOWED_TOPICS)
+
+def generate_checklist_docx():
+    """Generate and return a DOCX file for the application checklist."""
+    try:
+        doc = Document()
+        doc.add_heading('University Application Checklist', 0)
+
+        # Essential Documents Section
+        doc.add_heading('Essential Documents', level=1)
+        essential_items = [
+            "Statement of Purpose (SOP)",
+            "Letters of Recommendation (LOR)",
+            "Official Transcripts",
+            "Standardized Test Scores (GRE/GMAT if required)",
+            "English Proficiency Test (TOEFL/IELTS)",
+            "Resume/CV",
+            "Financial Documents"
+        ]
+        for item in essential_items:
+            doc.add_paragraph(item, style='List Bullet')
+
+        # Additional Requirements Section
+        doc.add_heading('Additional Requirements', level=1)
+        additional_items = [
+            "Portfolio (if applicable)",
+            "Writing Samples (if required)",
+            "Research Proposal (for research programs)",
+            "Letter of Intent"
+        ]
+        for item in additional_items:
+            doc.add_paragraph(item, style='List Bullet')
+
+        # Administrative Tasks Section
+        doc.add_heading('Administrative Tasks', level=1)
+        admin_items = [
+            "Application Form Completion",
+            "Application Fee Payment",
+            "Passport Copy",
+            "Photograph according to specifications",
+            "Verification of Document Copies"
+        ]
+        for item in admin_items:
+            doc.add_paragraph(item, style='List Bullet')
+
+        # Post-Admission Steps Section
+        doc.add_heading('Post-Admission Steps', level=1)
+        post_items = [
+            "Accept Admission Offer",
+            "Pay Deposit",
+            "Apply for Visa",
+            "Book Accommodation",
+            "Purchase Health Insurance",
+            "Plan Travel"
+        ]
+        for item in post_items:
+            doc.add_paragraph(item, style='List Bullet')
+
+        # Save to BytesIO object
+        doc_bytes = BytesIO()
+        doc.save(doc_bytes)
+        doc_bytes.seek(0)
+        return doc_bytes
+    except Exception as e:
+        logger.error(f"Error generating checklist docx: {str(e)}")
+        return None
+
+def handle_tracker_command(query: str) -> str:
+    """Handle natural language commands for the application tracker."""
+    query = query.lower()
+    if "add" in query and "to the tracker" in query:
+        # Extract university name between "add" and "to the tracker"
+        try:
+            start_idx = query.find("add") + 4
+            end_idx = query.find("to the tracker")
+            if start_idx < end_idx:
+                university = query[start_idx:end_idx].strip()
+                update_application_tracker(
+                    st.session_state.current_user,
+                    university,
+                    "Planning to Apply"
+                )
+                return f"Added {university} to your application tracker."
+        except Exception as e:
+            logger.error(f"Error processing tracker command: {str(e)}")
+    return None
 
 def initialize_chromadb():
     """Initialize ChromaDB with OpenAI embeddings."""
@@ -270,7 +458,7 @@ def reset_chromadb():
     except Exception as e:
         logger.error(f"Error resetting ChromaDB: {str(e)}")
         return False
-    
+
 def get_living_expenses(state: str) -> str:
     """Query living expenses information."""
     try:
@@ -306,6 +494,23 @@ def get_university_info(query: str) -> str:
     except Exception as e:
         logger.error(f"Error in get_university_info: {str(e)}")
         return f"Error retrieving university information: {str(e)}"
+
+def generate_application_tracker_template():
+    """Generate a CSV template for tracking university applications."""
+    # Create a DataFrame with example data and empty rows
+    template_df = pd.DataFrame({
+        'University Name': ['Example University', 'Sample College', '', '', '', '', '', '', '', ''],
+        'Program/Major': ['Computer Science', 'Data Science', '', '', '', '', '', '', '', ''],
+        'Application Status': ['In Progress', 'Planning to Apply', '', '', '', '', '', '', '', ''],
+        'Application Deadline': ['2024-12-31', '2024-11-30', '', '', '', '', '', '', '', ''],
+        'Required Documents': ['Transcripts, LORs, SOP', 'Transcripts, Portfolio', '', '', '', '', '', '', '', ''],
+        'Notes': ['Need to request transcripts', 'Portfolio in progress', '', '', '', '', '', '', '', ''],
+        'Estimated Cost': ['$50,000', '$45,000', '', '', '', '', '', '', '', '']
+    })
+    
+    # Convert to CSV bytes for download
+    csv_bytes = template_df.to_csv(index=False).encode('utf-8')
+    return csv_bytes
 
 def get_weather_info(location: str) -> str:
     """Get weather information for a location's major city."""
@@ -378,6 +583,23 @@ def get_top_recommendations() -> str:
 def get_recommendations(query: str) -> str:
     """Generate recommendations based on user query and preferences."""
     try:
+        # Check if query is relevant
+        if not is_relevant_query(query):
+            return ("I apologize, but I can only assist with questions related to universities, "
+                   "education, weather, scholarships, job prospects, and related topics. "
+                   "Please feel free to ask about any of these areas!")
+        
+        # Add handling for application tracker queries
+        if "application tracker" in query.lower() or "my applications" in query.lower():
+            applications = st.session_state.user_data.get("applications", {})
+            if not applications:
+                return "You haven't added any applications to track yet. You can add applications using the Application Tracker button."
+            
+            response = "Here are your current applications:\n\n"
+            for univ, details in applications.items():
+                response += f"• {univ}: {details['status']}\n"
+            return response
+        
         # Check if query is about a previously recommended university
         last_recommendations = st.session_state.user_data.get("last_recommendations", "")
         context = []
@@ -417,6 +639,10 @@ def get_recommendations(query: str) -> str:
         context_text = "\n\n".join([f"{title}\n{info}" for title, info in context])
         preferences = st.session_state.user_data["preferences"]
         
+        # Calculate appropriate token limit based on context length
+        expected_length = len(context_text) + len(query)
+        max_tokens = 500 if expected_length < 1000 else 300
+
         prompt = f"""As a university advisor, help with this query: {query}
 
 Context:
@@ -433,7 +659,6 @@ Previous conversation context (if relevant):
 
 Provide a detailed, specific response focusing on the query. If the query is about a specific university from the previous recommendations, reference that information."""
 
-        # Generate response using OpenAI
         client = OpenAI(api_key=st.secrets["open-key"])
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -441,13 +666,13 @@ Provide a detailed, specific response focusing on the query. If the query is abo
                 {
                     "role": "system", 
                     "content": ("You are a helpful university advisor for international students. "
-                              "When asked about specific universities from previous recommendations, "
-                              "maintain consistency with that information while adding more details. "
-                              "Provide specific, actionable insights.")
+                              "Provide specific, actionable insights. If the response needs to be "
+                              "longer than the token limit allows, provide a concise summary of "
+                              "the most important points.")
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,
+            max_tokens=max_tokens,
             temperature=0.7
         )
         
@@ -513,12 +738,12 @@ def show_preferences_form(existing_preferences=None):
             help="Select your preferred locations"
         )
         
-        # Weather Preference
+        # Weather Preference as dropdown
         default_weather = existing_preferences.get("weather_preference", "Moderate") if existing_preferences else "Moderate"
-        weather_preference = st.select_slider(
+        weather_preference = st.selectbox(
             "Weather Preference",
             options=["Cold", "Moderate", "Warm", "Hot"],
-            value=default_weather,
+            index=["Cold", "Moderate", "Warm", "Hot"].index(default_weather) if default_weather else 1,
             help="Select your preferred weather type"
         )
         
@@ -540,14 +765,58 @@ def show_preferences_form(existing_preferences=None):
             save_user_preferences(st.session_state.current_user, preferences)
             st.success("✅ Preferences saved successfully!")
             
-            # Immediately hide preferences form and trigger chat interface
             st.session_state.show_preferences = False
-            
-            # Use rerun to refresh the page and show chat interface
             st.rerun()
             
             return True
     return False
+
+def show_application_tracker():
+    """Display the application tracking interface."""
+    st.subheader("📝 Application Tracker Template")
+    
+    # Generate and provide download button for CSV template
+    csv_template = generate_application_tracker_template()
+    st.download_button(
+        label="📥 Download Application Tracker Template",
+        data=csv_template,
+        file_name="university_application_tracker.csv",
+        mime="text/csv",
+        help="Download a CSV template to track your university applications"
+    )
+    
+    st.write("""
+    ### How to Use the Template:
+    1. Download the CSV template
+    2. Open it in Excel, Google Sheets, or any spreadsheet software
+    3. Fill in your application details
+    4. Keep track of deadlines and required documents
+    5. Update status as you progress
+    
+    The template includes example entries to help you get started.
+    """)
+
+def authenticate_user(username: str) -> bool:
+    """Authenticate user and load their data."""
+    users = load_user_data()
+    
+    # Initialize session state for new user with explicit applications field
+    if username not in users:
+        users[username] = {
+            "preferences": None,
+            "chat_history": [],
+            "last_recommendations": None,
+            "applications": {},  # Explicitly initialize applications
+            "created_at": datetime.now().isoformat()
+        }
+        save_user_data(users)
+    
+    # Load user data into session state
+    st.session_state.current_user = username
+    st.session_state.user_data = users[username]
+    st.session_state.authenticated = True
+    
+    return True
 
 def show_sidebar():
     """Display sidebar with tips and preferences."""
@@ -590,8 +859,8 @@ def show_chat_interface():
     
     st.header("💬 Chat with COMPASS")
     
-    # Top recommendations and clear chat buttons
-    col1, col2 = st.columns(2)
+    # Buttons row
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.button("🌟 Top 3 Recommendations"):
             recommendations = get_top_recommendations()
@@ -603,6 +872,20 @@ def show_chat_interface():
                             st.session_state.user_data["chat_history"])
     
     with col2:
+        checklist_doc = generate_checklist_docx()
+        if checklist_doc:
+            st.download_button(
+                label="📋 Download Checklist",
+                data=checklist_doc,
+                file_name="application_checklist.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+    
+    with col3:
+        if st.button("📊 Tracker Template"):
+            show_application_tracker()
+    
+    with col4:
         if st.button("🗑️ Clear Chat"):
             st.session_state.user_data["chat_history"] = []
             save_chat_history(st.session_state.current_user, [])
@@ -615,6 +898,20 @@ def show_chat_interface():
 
     # Chat input
     if prompt := st.chat_input("Ask me about universities, programs, costs, or job prospects..."):
+        # Check for tracker commands
+        tracker_response = handle_tracker_command(prompt)
+        if tracker_response:
+            with st.chat_message("assistant"):
+                st.write(tracker_response)
+            st.session_state.user_data["chat_history"].append({
+                "role": "assistant",
+                "content": tracker_response
+            })
+            save_chat_history(st.session_state.current_user,
+                            st.session_state.user_data["chat_history"])
+            st.rerun()
+            return
+
         # Display user message
         with st.chat_message("user"):
             st.write(prompt)

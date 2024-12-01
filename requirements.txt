@@ -5,3 +5,4 @@ openai
 python-docx
 requests
 pysqlite3-binary
+docx
