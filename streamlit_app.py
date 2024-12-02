@@ -139,7 +139,7 @@ def authenticate_user(username: str) -> bool:
             "preferences": None,
             "chat_history": [],
             "last_recommendations": None,
-            "applications": {},  # Added for tracking applications
+            "applications": {},
             "created_at": datetime.now().isoformat()
         }
         save_user_data(users)
@@ -309,7 +309,6 @@ def handle_tracker_command(query: str) -> str:
     """Handle natural language commands for the application tracker."""
     query = query.lower()
     if "add" in query and "to the tracker" in query:
-        # Extract university name between "add" and "to the tracker"
         try:
             start_idx = query.find("add") + 4
             end_idx = query.find("to the tracker")
@@ -497,7 +496,6 @@ def get_university_info(query: str) -> str:
 
 def generate_application_tracker_template():
     """Generate a CSV template for tracking university applications."""
-    # Create a DataFrame with example data and empty rows
     template_df = pd.DataFrame({
         'University Name': ['Example University', 'Sample College', '', '', '', '', '', '', '', ''],
         'Program/Major': ['Computer Science', 'Data Science', '', '', '', '', '', '', '', ''],
@@ -556,7 +554,7 @@ def get_top_recommendations() -> str:
         * Location and weather notes
         * Brief distinguishing features
 
-        Keep each university description detailed but concise. Include specific programs, costs, and unique features."""
+        Keep each university description detailed but concise. Include specific programs, costs, and unique features. Make sure the text font is concistent enough, don't change the font mid sentence."""
 
         client = OpenAI(api_key=st.secrets["open-key"])
         response = client.chat.completions.create(
@@ -568,7 +566,7 @@ def get_top_recommendations() -> str:
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
+            max_tokens=1000,
             temperature=0.7
         )
         
@@ -582,13 +580,7 @@ def get_top_recommendations() -> str:
 
 def get_recommendations(query: str) -> str:
     """Generate recommendations based on user query and preferences."""
-    try:
-        # Check if query is relevant
-        if not is_relevant_query(query):
-            return ("I apologize, but I can only assist with questions related to universities, "
-                   "education, weather, scholarships, job prospects, and related topics. "
-                   "Please feel free to ask about any of these areas!")
-        
+    try:        
         # Add handling for application tracker queries
         if "application tracker" in query.lower() or "my applications" in query.lower():
             applications = st.session_state.user_data.get("applications", {})
@@ -657,7 +649,7 @@ Student Profile:
 Previous conversation context (if relevant):
 {last_recommendations}
 
-Provide a detailed, specific response focusing on the query. If the query is about a specific university from the previous recommendations, reference that information."""
+Provide a concise, specific response focusing on the query. If the query is about a specific university from the previous recommendations, reference that information. If the query is completely unrelated alert the user saying you can only answer questions on universities, job aspects"""
 
         client = OpenAI(api_key=st.secrets["open-key"])
         response = client.chat.completions.create(
@@ -711,47 +703,98 @@ def show_login_page():
                 st.rerun()
 
 def show_preferences_form(existing_preferences=None):
-    """Display the preferences setup/edit form."""
+    """Display the preferences setup/edit form with multiple weather choices."""
     with st.form("preferences_form"):
         # Field of Study (text input)
+        field_of_study = existing_preferences.get("field_of_study", "") if existing_preferences else ""
         field_of_study = st.text_input(
             "Field of Study",
-            value=existing_preferences.get("field_of_study", "") if existing_preferences else "",
+            value=field_of_study,
             help="Enter your intended field of study"
         )
         
-        # Budget Range
-        default_min = existing_preferences.get("budget_min", 20000) if existing_preferences else 20000
-        default_max = existing_preferences.get("budget_max", 50000) if existing_preferences else 50000
-        budget_range = st.slider(
-            "Budget Range (USD/Year)",
-            0, 100000, (default_min, default_max),
-            help="Select your annual budget range"
-        )
+        # Budget Range with "Any" checkbox
+        default_budget_any = (
+            existing_preferences.get("budget_min", 0) == 0 and 
+            existing_preferences.get("budget_max", 100000) == 100000
+        ) if existing_preferences else False
         
-        # Preferred Locations
-        default_locations = existing_preferences.get("preferred_locations", []) if existing_preferences else []
-        preferred_locations = st.multiselect(
-            "Preferred Locations",
-            ["Northeast", "Southeast", "Midwest", "Southwest", "West Coast"],
-            default=default_locations,
-            help="Select your preferred locations"
-        )
+        use_any_budget = st.checkbox("Any Budget", 
+                                   value=default_budget_any,
+                                   help="Select this to consider all budget ranges")
         
-        # Weather Preference as dropdown
-        default_weather = existing_preferences.get("weather_preference", "Moderate") if existing_preferences else "Moderate"
-        weather_preference = st.selectbox(
-            "Weather Preference",
-            options=["Cold", "Moderate", "Warm", "Hot"],
-            index=["Cold", "Moderate", "Warm", "Hot"].index(default_weather) if default_weather else 1,
-            help="Select your preferred weather type"
-        )
+        if not use_any_budget:
+            default_min = existing_preferences.get("budget_min", 20000) if existing_preferences else 20000
+            default_max = existing_preferences.get("budget_max", 50000) if existing_preferences else 50000
+            budget_range = st.slider(
+                "Budget Range (USD/Year)",
+                0, 100000, (default_min, default_max),
+                help="Select your annual budget range"
+            )
+        else:
+            budget_range = (0, 100000)
+            st.info("Considering all budget ranges")
+        
+        # Preferred Locations with "All" checkbox
+        default_all_locations = len(existing_preferences.get("preferred_locations", [])) == 5 if existing_preferences else False
+        use_all_locations = st.checkbox("All Locations", 
+                                      value=default_all_locations,
+                                      help="Select this to consider all locations")
+        
+        if not use_all_locations:
+            default_locations = existing_preferences.get("preferred_locations", []) if existing_preferences else []
+            preferred_locations = st.multiselect(
+                "Preferred Locations",
+                ["Northeast", "Southeast", "Midwest", "Southwest", "West Coast"],
+                default=default_locations,
+                help="Select your preferred locations"
+            )
+        else:
+            preferred_locations = ["Northeast", "Southeast", "Midwest", "Southwest", "West Coast"]
+            st.info("Considering all locations")
+        
+        # Weather Preferences with "All" checkbox
+        default_all_weather = True
+        if existing_preferences and "weather_preference" in existing_preferences:
+            if isinstance(existing_preferences["weather_preference"], list):
+                default_all_weather = len(existing_preferences["weather_preference"]) == 4
+            else:
+                default_all_weather = existing_preferences["weather_preference"] == "All"
+        
+        use_all_weather = st.checkbox("All Weather Types", 
+                                    value=default_all_weather,
+                                    help="Select this to consider all weather types")
+        
+        if not use_all_weather:
+            default_weather = (
+                existing_preferences.get("weather_preference", [])
+                if isinstance(existing_preferences.get("weather_preference", []), list)
+                else []
+            ) if existing_preferences else []
+            
+            weather_preferences = st.multiselect(
+                "Weather Preferences",
+                ["Cold", "Moderate", "Warm", "Hot"],
+                default=default_weather,
+                help="Select multiple weather preferences"
+            )
+        else:
+            weather_preferences = "All"
+            st.info("Considering all weather types")
         
         submitted = st.form_submit_button("Save Preferences")
         
         if submitted:
-            if not field_of_study or not preferred_locations:
-                st.error("Please fill in all required fields.")
+            if not field_of_study:
+                st.error("Please fill in the field of study.")
+                return False
+            
+            if not use_all_locations and not preferred_locations:
+                st.error("Please select at least one location or choose 'All Locations'.")
+                return False
+            
+            if not use_all_weather and not weather_preferences:
+                st.error("Please select at least one weather preference or choose 'All Weather Types'.")
                 return False
             
             preferences = {
@@ -759,7 +802,7 @@ def show_preferences_form(existing_preferences=None):
                 "budget_min": budget_range[0],
                 "budget_max": budget_range[1],
                 "preferred_locations": preferred_locations,
-                "weather_preference": weather_preference
+                "weather_preference": weather_preferences  # Now can be either "All" or a list
             }
             
             save_user_preferences(st.session_state.current_user, preferences)
@@ -821,23 +864,52 @@ def authenticate_user(username: str) -> bool:
 def show_sidebar():
     """Display sidebar with tips and preferences."""
     with st.sidebar:
-        st.title("🎓 COMPASS Guide")
-        
-        # Show current user
+        st.title("🎓 COMPASS - Comprehensive Master’s Program Assistant for Student Success")
+        # Show current user and date
+        current_date = datetime.now().strftime("%B %d, %Y")
+        st.write(f"📅 {current_date}")
         st.write(f"👤 Logged in as: {st.session_state.current_user}")
+        
+        # Separator
+        st.markdown("---")
         
         # Current Preferences Section
         st.header("📋 Your Preferences")
         prefs = st.session_state.user_data.get("preferences", {})
         if prefs:
             st.write(f"**Field of Study:** {prefs.get('field_of_study')}")
-            st.write(f"**Budget:** ${prefs.get('budget_min'):,} - ${prefs.get('budget_max'):,}")
-            st.write(f"**Locations:** {', '.join(prefs.get('preferred_locations', []))}")
-            st.write(f"**Weather:** {prefs.get('weather_preference')}")
+            
+            # Display budget
+            if prefs.get('budget_min') == 0 and prefs.get('budget_max') == 100000:
+                st.write("**Budget:** Any")
+            else:
+                st.write(f"**Budget:** ${prefs.get('budget_min'):,} - ${prefs.get('budget_max'):,}")
+            
+            # Display locations
+            locations = prefs.get('preferred_locations', [])
+            if len(locations) == 5:
+                st.write("**Locations:** All")
+            else:
+                st.write(f"**Locations:** {', '.join(locations)}")
+            
+            # Display weather preferences
+            weather_pref = prefs.get('weather_preference')
+            if weather_pref == "All" or (isinstance(weather_pref, list) and len(weather_pref) == 4):
+                st.write("**Weather:** All")
+            elif isinstance(weather_pref, list):
+                st.write(f"**Weather:** {', '.join(weather_pref)}")
+            else:
+                st.write("**Weather:** None")
             
             if st.button("✏️ Edit Preferences"):
                 st.session_state.show_preferences = True
         
+        # Add introduction
+        st.markdown("""
+        ---
+        ### About COMPASS
+        Your AI companion for university selection and application guidance. Get personalized recommendations for universities, and receive insights about living costs, weather, and job prospects in different locations.
+        """)
         # Tips Section
         st.markdown(CHATBOT_TIPS)
         
