@@ -688,19 +688,86 @@ def initialize_session_state():
         st.session_state.show_preferences = False
 
 def show_login_page():
-    """Display the login page."""
-    st.header("👋 Welcome to COMPASS")
+    """Display a login page with logo."""
+    # Custom CSS to ensure dark theme
+    st.markdown("""
+        <style>
+        /* Dark theme overrides */
+        .stTextInput input {
+            background-color: #2b303b;
+            color: white;
+            border: 1px solid #4a4d52;
+        }
+        .stTextInput input::placeholder {
+            color: #8e929b;
+        }
+        .stButton button {
+            width: 100%;
+            background-color: #ff4b4b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .stButton button:hover {
+            background-color: #ff3333;
+            border: none;
+        }
+        div[data-testid="stToolbar"] {
+            display: none;
+        }
+        .main > div {
+            background-color: #1b1e23;
+        }
+        /* Image container styling */
+        .img-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
     
-    with st.form("login_form"):
-        username = st.text_input("Enter your name")
-        submitted = st.form_submit_button("Login")
+    with col2:
+        # Image display
+        try:
+            st.image(os.path.join("data", "compass_logo_wide.png"), use_container_width= True)
+        except Exception as e:
+            st.error(f"Unable to load image: {str(e)}")
+            
+        st.markdown("""
+            <div style='text-align: center; padding: 20px; color: white;'>
+                <h1>🎓 Welcome to COMPASS</h1>
+                <p style='font-size: 1.2em; color: #8e929b;'>Your AI-powered University Guide</p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        if submitted and username:
-            if authenticate_user(username):
-                st.success(f"Welcome, {username}!")
-                if not st.session_state.user_data.get("preferences"):
-                    st.info("Please set your preferences to continue.")
-                st.rerun()
+        with st.form("login_form", clear_on_submit=True):
+            username = st.text_input("👤 Enter your name", 
+                                   placeholder="Type your name here...",
+                                   help="This will be used as your username & will personalize your experience")
+            
+            submitted = st.form_submit_button("🚀 Start Your Journey")
+            
+            if submitted and username:
+                if authenticate_user(username):
+                    st.success(f"Welcome aboard, {username}! 🎉")
+                    if not st.session_state.user_data.get("preferences"):
+                        st.info("Let's set up your preferences to get started.")
+                    st.rerun()
+        
+        st.markdown("""
+            <div style='text-align: center; padding: 20px; color: #8e929b;'>
+                <p>COMPASS helps you:</p>
+                <p style='color: #b4b9c2;'>🎯 Find the perfect university</p>
+                <p style='color: #b4b9c2;'>💰 Understand costs and living expenses</p>
+                <p style='color: #b4b9c2;'>🌤️ Get location and weather insights</p>
+                <p style='color: #b4b9c2;'>💼 Explore career opportunities</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 def show_preferences_form(existing_preferences=None):
     """Display the preferences setup/edit form with multiple weather choices."""
