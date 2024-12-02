@@ -864,7 +864,11 @@ def authenticate_user(username: str) -> bool:
 def show_sidebar():
     """Display sidebar with tips and preferences."""
     with st.sidebar:
-        st.title("🎓 COMPASS - Comprehensive Master’s Program Assistant for Student Success")
+        try:
+            st.image(os.path.join("data", "compass_logo.png"), use_container_width= True)
+        except:
+            st.error("Image not found. Please check the path.")
+
         # Show current user and date
         current_date = datetime.now().strftime("%B %d, %Y")
         st.write(f"📅 {current_date}")
