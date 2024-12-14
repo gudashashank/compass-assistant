@@ -130,13 +130,4 @@ compass/
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Acknowledgments 🙏
-
-- OpenAI for GPT-4 API
-- OpenWeather for weather data
-- ChromaDB for vector database
-- Streamlit for web interface
-
-## Support 🆘
-
-For support, please open an issue in the repository or contact the maintainers.
+**Made with 💙 by [Shashank Guda](https://shashankguda.me)**
