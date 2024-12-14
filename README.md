@@ -2,6 +2,8 @@
 
 COMPASS is an AI-powered university guidance system that helps international students find and track university programs, living expenses, and career opportunities in the United States. The system provides personalized recommendations based on user preferences and maintains an interactive chat interface for queries about universities, costs, weather, and job prospects.
 
+![COMPASS](data/compass_logo_wide.png)
+
 ## Features 🌟
 
 - **Personalized University Recommendations**: Get customized university suggestions based on:
