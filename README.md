@@ -128,6 +128,9 @@ compass/
 
 ## License 📄
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
+
+📝 **Note:**  
+This app will remain available until my current API credits are exhausted. At this time, I am unable to provide an option for users to connect their own API to the app. I apologize for the inconvenience and appreciate your understanding.
 
 **Made with 💙 by [Shashank Guda](https://shashankguda.me)**
