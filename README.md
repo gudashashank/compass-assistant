@@ -128,7 +128,7 @@ compass/
 
 ## License 📄
 
-This project is licensed under the MIT License.
+This project is licensed under Apache License.
 
 📝 **Note:**  
 This app will remain available until my current API credits are exhausted. At this time, I am unable to provide an option for users to connect their own API to the app. I apologize for the inconvenience and appreciate your understanding.
