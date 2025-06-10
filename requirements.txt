@@ -6,3 +6,4 @@ python-docx
 requests
 pysqlite3-binary
 docx
+protobuf==3.20.3
